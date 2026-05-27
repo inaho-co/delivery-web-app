@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Deploy to Render
         run: |
-          curl -X POST https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }}
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
