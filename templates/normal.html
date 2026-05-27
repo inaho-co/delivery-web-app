@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>通常モード — 稲穂納品書</title>
+<title>通常モード — 稲穂事務ツールWEB版</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; }
@@ -130,6 +130,14 @@ document.getElementById('mainForm').addEventListener('submit', function() {
   document.getElementById('btnSubmit').disabled = true;
   document.getElementById('btnSubmit').textContent = '処理中...';
 });
+
+{% if preselected_order_id %}
+window.addEventListener('DOMContentLoaded', function() {
+  const sel = document.getElementById('orderFile');
+  sel.value = '{{ preselected_order_id }}';
+  if (sel.value) { loadStores(); }
+});
+{% endif %}
 </script>
 </body>
 </html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>倉庫FAX確認 — 稲穂事務ツールWEB版</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; }
+.header { background: #1a2332; color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+.back { color: #94a3b8; text-decoration: none; font-size: 22px; }
+.header h1 { font-size: 17px; }
+.content { padding: 24px 20px; max-width: 640px; margin: 0 auto; }
+.error { background: #fef2f2; color: #dc2626; border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 20px; }
+.section { background: #fff; border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+.section-title { font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+label { display: block; font-size: 13px; color: #4a5568; margin-bottom: 6px; font-weight: 600; }
+select { width: 100%; padding: 12px 14px; border: 1.5px solid #d0dae6; border-radius: 10px; font-size: 15px; outline: none; background: #fff; appearance: auto; }
+select:focus { border-color: #f59e0b; }
+.btn-load { width: 100%; padding: 13px; background: #fef3c7; color: #92400e; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+.btn-load:active { background: #fde68a; }
+.btn-load:disabled { opacity: 0.6; cursor: not-allowed; }
+.loading { display: none; text-align: center; color: #7a8ca0; font-size: 14px; padding: 12px; }
+.status-bar { font-size: 13px; color: #4a5568; padding: 10px 0 4px; }
+.status-bar strong { color: #f59e0b; }
+#table-section { display: none; }
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 12px; }
+table { border-collapse: collapse; min-width: 100%; font-size: 13px; }
+th { background: #f8fafc; color: #64748b; font-weight: 700; padding: 8px 10px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; text-align: center; }
+th.col-name { text-align: left; }
+td { padding: 6px 8px; border-bottom: 1px solid #f0f4f8; vertical-align: middle; }
+td.col-code { font-family: 'Courier New', monospace; font-weight: 700; color: #1a2332; text-align: center; white-space: nowrap; }
+td.col-name { color: #1a2332; }
+td.col-hinban { color: #3b82f6; text-align: center; white-space: nowrap; }
+td.col-qty { text-align: center; }
+.qty-input {
+  width: 58px; padding: 5px 4px; text-align: center;
+  border: 1.5px solid #d0dae6; border-radius: 6px;
+  font-size: 14px; font-weight: 700;
+  background: #fff; color: #1a2332;
+  -moz-appearance: textfield;
+}
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty-input:focus { outline: none; border-color: #3b82f6; }
+.qty-input.changed { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+.qty-input.zero { color: #9ca3af; }
+.legend { display: flex; gap: 16px; font-size: 12px; color: #7a8ca0; margin-top: 10px; flex-wrap: wrap; }
+.legend span::before { margin-right: 4px; }
+.btn-save { width: 100%; padding: 16px; background: #d97706; color: #fff; border: none; border-radius: 12px; font-size: 17px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.btn-save:active { background: #b45309; }
+.btn-save:disabled { background: #fcd34d; color: #78350f; }
+</style>
+</head>
+<body>
+<div class="header">
+  <a href="/" class="back">‹</a>
+  <h1>📠 倉庫FAX確認</h1>
+</div>
+<div class="content">
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <div class="section">
+    <div class="section-title">① 発注書ファイル（FAX）</div>
+    <label>BOXから選択</label>
+    <select id="orderFile">
+      <option value="">— 選択してください —</option>
+      {% for f in order_files %}
+      <option value="{{ f.id }}">{{ f.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button class="btn-load" id="btnLoad" onclick="loadTable()">
+    🔍 商品テーブルを確認する
+  </button>
+  <div class="loading" id="loading">読み込み中...</div>
+
+  <form method="POST" action="/fax/save" id="faxForm">
+    <input type="hidden" name="order_file_id" id="hidOrderFileId">
+    <input type="hidden" name="stores" id="hidStores">
+
+    <div id="table-section">
+      <div class="section">
+        <div class="section-title">② 数量を確認・修正</div>
+        <div class="status-bar" id="statusBar"></div>
+        <div class="tbl-wrap">
+          <table id="faxTable">
+            <thead id="faxThead"></thead>
+            <tbody id="faxTbody"></tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span>通常: 発注あり</span>
+          <span style="color:#9ca3af">グレー: 発注なし</span>
+          <span style="color:#92400e; background:#fffbeb; padding:0 4px; border-radius:3px">橙: 変更あり</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-save" id="btnSave">
+        📦 数量を確定して発注書を保存 → 通常モードへ
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+async function loadTable() {
+  const fileId = document.getElementById('orderFile').value;
+  if (!fileId) { alert('発注書ファイルを選択してください'); return; }
+
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('btnLoad').disabled = true;
+  document.getElementById('table-section').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/fax/table', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_file_id: fileId })
+    });
+    const data = await res.json();
+    if (data.error) { alert('エラー: ' + data.error); return; }
+    renderTable(data.stores, data.items);
+    document.getElementById('hidOrderFileId').value = fileId;
+    document.getElementById('hidStores').value = JSON.stringify(data.stores);
+    document.getElementById('table-section').style.display = 'block';
+    document.getElementById('table-section').scrollIntoView({ behavior: 'smooth' });
+  } catch(e) {
+    alert('通信エラー: ' + e);
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('btnLoad').disabled = false;
+  }
+}
+
+function renderTable(stores, items) {
+  const thead = document.getElementById('faxThead');
+  const tbody = document.getElementById('faxTbody');
+  const statusBar = document.getElementById('statusBar');
+
+  // ヘッダー
+  let thHtml = '<tr><th>コード</th><th class="col-name">品名</th><th>品番</th>';
+  stores.forEach(s => {
+    const disp = s.length > 6 ? s.slice(0,5) + '…' : s;
+    thHtml += `<th title="${s}">${disp}</th>`;
+  });
+  thHtml += '</tr>';
+  thead.innerHTML = thHtml;
+
+  // 行
+  let rows = '';
+  items.forEach(item => {
+    rows += '<tr>';
+    rows += `<td class="col-code">${item.code}</td>`;
+    rows += `<td class="col-name">${item.name}</td>`;
+    rows += `<td class="col-hinban">${item.hinban}</td>`;
+    stores.forEach((s, si) => {
+      const qty = (item.qty_by_store && item.qty_by_store[s]) ? item.qty_by_store[s] : 0;
+      const zeroClass = qty === 0 ? ' zero' : '';
+      rows += `<td class="col-qty">
+        <input type="number" min="0"
+          class="qty-input${zeroClass}"
+          name="qty_${item.code}_${si}"
+          value="${qty}"
+          data-orig="${qty}"
+          oninput="onQtyChange(this)">
+      </td>`;
+    });
+    rows += '</tr>';
+  });
+  tbody.innerHTML = rows;
+
+  statusBar.innerHTML = `店舗: <strong>${stores.join(' ／ ')}</strong>　｜　全 <strong>${items.length}</strong> 商品`;
+}
+
+function onQtyChange(input) {
+  const orig = parseInt(input.dataset.orig, 10);
+  const cur = parseInt(input.value, 10);
+  input.classList.remove('changed', 'zero');
+  if (isNaN(cur)) return;
+  if (cur !== orig) {
+    input.classList.add('changed');
+  } else if (cur === 0) {
+    input.classList.add('zero');
+  }
+}
+
+document.getElementById('faxForm').addEventListener('submit', function() {
+  document.getElementById('btnSave').disabled = true;
+  document.getElementById('btnSave').textContent = '保存中...';
+});
+</script>
+</body>
+</html>

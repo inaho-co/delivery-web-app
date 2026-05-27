@@ -141,14 +141,17 @@ def index():
 def normal():
     order_folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
     delivery_folder_id = os.environ.get('BOX_DELIVERY_FOLDER_ID', '')
+    preselected_order_id = session.pop('fax_order_file_id', None)
     try:
         order_files = _list_excel_files(order_folder_id) if order_folder_id else []
         delivery_files = _list_excel_files(delivery_folder_id) if delivery_folder_id else []
     except Exception as e:
         return render_template('normal.html', error=f'BOX接続エラー: {e}',
-                               order_files=[], delivery_files=[])
+                               order_files=[], delivery_files=[],
+                               preselected_order_id=None)
     return render_template('normal.html', order_files=order_files,
-                           delivery_files=delivery_files, error=None)
+                           delivery_files=delivery_files, error=None,
+                           preselected_order_id=preselected_order_id)
 
 
 @app.route('/api/stores', methods=['POST'])
@@ -300,6 +303,225 @@ def manual_create():
                                delivery_files=[])
     finally:
         _cleanup(delivery_tmp, output_tmp)
+
+
+# ── 倉庫FAX確認 ────────────────────────────────────────────────
+
+def _parse_fax_order(path):
+    """発注書Excelの「稲穂」シートを解析して店舗・商品リストを返す。
+    tab_fax.py の _fax_load_sheet() 相当。"""
+    from openpyxl import load_workbook
+
+    exclude = {'', 'None', '区分', '商品ｺｰﾄﾞ', '商品コード', '品名', '品番',
+               'JANコード', 'JAN', '数量', '単価', '金額', '備考',
+               'BB', '工具館', '店舗名', '引取'}
+    PAGE_MARKS = {'①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'}
+
+    wb = load_workbook(path, data_only=True)
+    result_stores = []
+    result_items = []
+
+    for ws in wb.worksheets:
+        if '稲穂' not in ws.title:
+            continue
+        data = list(ws.iter_rows(values_only=True))
+
+        store_col_map = {}
+        store_row_vals = None
+        for ri, row in enumerate(data[:15]):
+            row_vals = [str(v or '').strip() for v in row]
+            if '店舗名' in row_vals:
+                candidates = [v for v in row_vals[4:] if v not in exclude]
+                if candidates:
+                    store_row_vals = row_vals
+                else:
+                    if ri + 1 < len(data):
+                        store_row_vals = [str(v or '').strip() for v in data[ri + 1]]
+                break
+
+        if store_row_vals is None:
+            continue
+
+        for ci, v in enumerate(store_row_vals):
+            if ci >= 4 and v not in exclude:
+                store_col_map[v] = ci
+
+        if not store_col_map:
+            continue
+
+        stores = list(store_col_map.keys())
+        result_stores = stores
+        items_map = {}
+
+        for row in data:
+            kubun = str(row[0] or '').strip()
+            code = str(row[1] or '').strip()
+            name = str(row[2] or '').replace('\n', '').strip()
+            hinban = str(row[3] or '').strip()
+
+            if kubun in PAGE_MARKS:
+                continue
+            if not code or code in ['商品ｺｰﾄﾞ', 'None', '']:
+                continue
+            if not kubun or kubun in ['区分', '企業名', '店舗名']:
+                continue
+            if not code.isdigit():
+                continue
+
+            if code not in items_map:
+                items_map[code] = {
+                    'code': code, 'name': name,
+                    'kubun': kubun, 'hinban': hinban,
+                    'qty_by_store': {}
+                }
+
+            for sname, ci in store_col_map.items():
+                val = row[ci] if ci < len(row) else None
+                try:
+                    qty = int(val)
+                except (TypeError, ValueError):
+                    qty = 0
+                existing = items_map[code]['qty_by_store'].get(sname, 0)
+                items_map[code]['qty_by_store'][sname] = max(existing, qty)
+
+        result_items = list(items_map.values())
+        break  # 最初の「稲穂」シートのみ使用
+
+    wb.close()
+    return {'stores': result_stores, 'items': result_items}
+
+
+def _write_fax_quantities(path, stores, quantities):
+    """発注書Excelの数量を quantities で上書きして保存。
+    quantities: {store_name: {code: qty}}"""
+    from openpyxl import load_workbook
+
+    exclude = {'', 'None', '区分', '商品ｺｰﾄﾞ', '商品コード', '品名', '品番',
+               'JANコード', 'JAN', '数量', '単価', '金額', '備考',
+               'BB', '工具館', '店舗名', '引取'}
+    PAGE_MARKS = {'①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'}
+
+    wb = load_workbook(path)
+    for ws in wb.worksheets:
+        if '稲穂' not in ws.title:
+            continue
+        data = list(ws.iter_rows(values_only=False))
+
+        store_col_map = {}
+        store_row_vals = None
+        for ri, row in enumerate(data[:15]):
+            row_vals = [str(row[ci].value or '').strip() for ci in range(len(row))]
+            if '店舗名' in row_vals:
+                candidates = [v for v in row_vals[4:] if v not in exclude]
+                if candidates:
+                    store_row_vals = row_vals
+                else:
+                    if ri + 1 < len(data):
+                        store_row_vals = [str(data[ri + 1][ci].value or '').strip()
+                                          for ci in range(len(data[ri + 1]))]
+                break
+
+        if store_row_vals is None:
+            continue
+
+        for ci, v in enumerate(store_row_vals):
+            if ci >= 4 and v not in exclude:
+                store_col_map[v] = ci
+
+        for row in data:
+            kubun = str(row[0].value or '').strip()
+            code = str(row[1].value or '').strip()
+            if not code or code in ['商品ｺｰﾄﾞ', 'None']:
+                continue
+            if not kubun or kubun in ['区分', '企業名', '店舗名'] or kubun in PAGE_MARKS:
+                continue
+            for sname, ci in store_col_map.items():
+                if sname in quantities and code in quantities[sname]:
+                    qty = quantities[sname][code]
+                    row[ci].value = qty if qty > 0 else None
+
+    wb.save(path)
+    wb.close()
+
+
+@app.route('/fax')
+@login_required
+def fax():
+    order_folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
+    try:
+        order_files = _list_excel_files(order_folder_id) if order_folder_id else []
+    except Exception as e:
+        return render_template('fax.html', error=f'BOX接続エラー: {e}', order_files=[])
+    return render_template('fax.html', order_files=order_files, error=None)
+
+
+@app.route('/api/fax/table', methods=['POST'])
+@login_required
+def api_fax_table():
+    order_file_id = request.json.get('order_file_id')
+    if not order_file_id:
+        return jsonify({'error': '発注書が未選択'}), 400
+    tmp = None
+    try:
+        tmp = _download_to_temp(order_file_id, suffix='.xlsx')
+        result = _parse_fax_order(tmp)
+        if not result['stores']:
+            return jsonify({'error': '「稲穂」シートまたは店舗情報が見つかりませんでした'}), 400
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        _cleanup(tmp)
+
+
+@app.route('/fax/save', methods=['POST'])
+@login_required
+def fax_save():
+    import json as _json, shutil, tempfile as _tempfile
+    order_file_id = request.form.get('order_file_id')
+    stores_json = request.form.get('stores', '[]')
+    try:
+        stores = _json.loads(stores_json)
+    except Exception:
+        stores = []
+
+    quantities = {}
+    for key, val in request.form.items():
+        if not key.startswith('qty_'):
+            continue
+        parts = key[4:].split('_', 1)
+        if len(parts) != 2:
+            continue
+        code, store_idx_str = parts
+        try:
+            store_idx = int(store_idx_str)
+            store_name = stores[store_idx]
+            qty = int(val) if val else 0
+            quantities.setdefault(store_name, {})[code] = qty
+        except (ValueError, IndexError):
+            continue
+
+    tmp = output_tmp = None
+    try:
+        tmp = _download_to_temp(order_file_id, suffix='.xlsx')
+        fd, output_tmp = _tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        shutil.copy2(tmp, output_tmp)
+        _write_fax_quantities(output_tmp, stores, quantities)
+        with open(output_tmp, 'rb') as f:
+            file_bytes = f.read()
+        _update_box_file(order_file_id, file_bytes)
+        session['fax_order_file_id'] = order_file_id
+        return redirect(url_for('normal'))
+    except Exception as e:
+        order_folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
+        try:
+            order_files = _list_excel_files(order_folder_id)
+        except Exception:
+            order_files = []
+        return render_template('fax.html', error=f'保存エラー: {e}', order_files=order_files)
+    finally:
+        _cleanup(tmp, output_tmp)
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>稲穂納品書</title>
+<title>稲穂事務ツールWEB版</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; }
@@ -15,6 +15,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
 .btn { display: block; width: 100%; padding: 22px 20px; border-radius: 14px; border: none; font-size: 17px; font-weight: 700; cursor: pointer; text-align: left; text-decoration: none; margin-bottom: 16px; }
 .btn-normal { background: #3b82f6; color: #fff; }
 .btn-manual { background: #10b981; color: #fff; }
+.btn-fax { background: #f59e0b; color: #fff; }
 .btn:active { opacity: 0.85; }
 .btn .icon { font-size: 28px; display: block; margin-bottom: 6px; }
 .btn .desc { font-size: 13px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
@@ -22,7 +23,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
 </head>
 <body>
 <div class="header">
-  <h1>🌾 稲穂納品書</h1>
+  <h1>🌾 稲穂事務ツールWEB版</h1>
   <a href="/logout" class="logout">ログアウト</a>
 </div>
 <div class="content">
@@ -36,6 +37,11 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
     <span class="icon">✏️</span>
     手入力モード
     <div class="desc">発注書なし・商品を手動で入力して作成</div>
+  </a>
+  <a href="/fax" class="btn btn-fax">
+    <span class="icon">📠</span>
+    倉庫FAX確認
+    <div class="desc">FAX発注書の数量確認・保存 → 通常モードへ</div>
   </a>
 </div>
 </body>
