@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>通常モード — 稲穂納品書</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; }
+.header { background: #1a2332; color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+.back { color: #94a3b8; text-decoration: none; font-size: 22px; }
+.header h1 { font-size: 17px; }
+.content { padding: 24px 20px; max-width: 480px; margin: 0 auto; }
+.error { background: #fef2f2; color: #dc2626; border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 20px; }
+.section { background: #fff; border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+.section-title { font-size: 12px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+label { display: block; font-size: 13px; color: #4a5568; margin-bottom: 6px; font-weight: 600; }
+select, input[type=text] {
+  width: 100%; padding: 12px 14px; border: 1.5px solid #d0dae6; border-radius: 10px;
+  font-size: 15px; outline: none; background: #fff; appearance: auto;
+}
+select:focus, input[type=text]:focus { border-color: #3b82f6; }
+.date-row { display: flex; gap: 8px; align-items: center; }
+.date-row input { flex: 1; }
+.date-row span { color: #7a8ca0; font-size: 14px; flex-shrink: 0; }
+.btn-stores { width: 100%; padding: 13px; background: #e0edff; color: #2563eb; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+.btn-stores:active { background: #bfdbfe; }
+#store-section { display: none; }
+.btn-submit { width: 100%; padding: 16px; background: #3b82f6; color: #fff; border: none; border-radius: 12px; font-size: 17px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.btn-submit:active { background: #2563eb; }
+.btn-submit:disabled { background: #93c5fd; }
+.loading { display: none; text-align: center; color: #7a8ca0; font-size: 14px; padding: 12px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <a href="/" class="back">‹</a>
+  <h1>📋 通常モード</h1>
+</div>
+<div class="content">
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="POST" action="/normal/create" id="mainForm">
+    <div class="section">
+      <div class="section-title">① 発注書ファイル</div>
+      <label>BOXから選択</label>
+      <select name="order_file_id" id="orderFile" required>
+        <option value="">— 選択してください —</option>
+        {% for f in order_files %}
+        <option value="{{ f.id }}">{{ f.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="section">
+      <div class="section-title">② 納品書ファイル</div>
+      <label>BOXから選択</label>
+      <select name="delivery_file_id" id="deliveryFile" required>
+        <option value="">— 選択してください —</option>
+        {% for f in delivery_files %}
+        <option value="{{ f.id }}">{{ f.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="section">
+      <div class="section-title">③ 日付</div>
+      <div class="date-row">
+        <input type="text" name="date_str" id="dateStr" placeholder="例: 0527" maxlength="4" inputmode="numeric" required>
+        <span>（月日4桁）</span>
+      </div>
+    </div>
+
+    <button type="button" class="btn-stores" id="btnStores" onclick="loadStores()">
+      店舗リストを確認する
+    </button>
+    <div class="loading" id="loading">読み込み中...</div>
+
+    <div class="section" id="store-section">
+      <div class="section-title">④ 店舗を選択</div>
+      <label>店舗名</label>
+      <select name="store_name" id="storeSelect" required>
+        <option value="">— 選択してください —</option>
+      </select>
+    </div>
+
+    <button type="submit" class="btn-submit" id="btnSubmit" style="display:none">
+      納品書を作成・送信する
+    </button>
+  </form>
+</div>
+
+<script>
+async function loadStores() {
+  const orderFileId = document.getElementById('orderFile').value;
+  if (!orderFileId) { alert('発注書ファイルを選択してください'); return; }
+
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('btnStores').disabled = true;
+
+  try {
+    const res = await fetch('/api/stores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_file_id: orderFileId })
+    });
+    const data = await res.json();
+    if (data.error) { alert('エラー: ' + data.error); return; }
+
+    const sel = document.getElementById('storeSelect');
+    sel.innerHTML = '<option value="">— 選択してください —</option>';
+    data.stores.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      sel.appendChild(opt);
+    });
+
+    document.getElementById('store-section').style.display = 'block';
+    document.getElementById('btnSubmit').style.display = 'block';
+    document.getElementById('store-section').scrollIntoView({ behavior: 'smooth' });
+  } catch(e) {
+    alert('通信エラー: ' + e);
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('btnStores').disabled = false;
+  }
+}
+
+document.getElementById('mainForm').addEventListener('submit', function() {
+  document.getElementById('btnSubmit').disabled = true;
+  document.getElementById('btnSubmit').textContent = '処理中...';
+});
+</script>
+</body>
+</html>

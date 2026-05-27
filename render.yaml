@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: delivery-web-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: BOX_CLIENT_ID
+        sync: false
+      - key: BOX_CLIENT_SECRET
+        sync: false
+      - key: BOX_ACCESS_TOKEN
+        sync: false
+      - key: BOX_REFRESH_TOKEN
+        sync: false
+      - key: BOX_ORDER_FOLDER_ID
+        sync: false
+      - key: BOX_DELIVERY_FOLDER_ID
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: GMAIL_TO
+        sync: false
+      - key: APP_PASSWORD
+        sync: false

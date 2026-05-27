@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手入力モード — 稲穂納品書</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; }
+.header { background: #1a2332; color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+.back { color: #94a3b8; text-decoration: none; font-size: 22px; }
+.header h1 { font-size: 17px; }
+.content { padding: 24px 20px; max-width: 480px; margin: 0 auto; }
+.error { background: #fef2f2; color: #dc2626; border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 20px; }
+.section { background: #fff; border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+.section-title { font-size: 12px; font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+label { display: block; font-size: 13px; color: #4a5568; margin-bottom: 6px; font-weight: 600; }
+select, input[type=text], input[type=number] {
+  width: 100%; padding: 10px 12px; border: 1.5px solid #d0dae6; border-radius: 8px;
+  font-size: 14px; outline: none; background: #fff;
+}
+select:focus, input:focus { border-color: #10b981; }
+.date-row { display: flex; gap: 8px; align-items: center; }
+.date-row input { flex: 1; }
+.date-row span { color: #7a8ca0; font-size: 13px; flex-shrink: 0; }
+
+/* 商品行 */
+.item-card { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 10px; position: relative; }
+.item-card .del-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 18px; color: #94a3b8; cursor: pointer; line-height: 1; }
+.item-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.item-grid .full { grid-column: 1 / -1; }
+.field-label { font-size: 11px; color: #7a8ca0; font-weight: 600; margin-bottom: 3px; }
+
+.btn-add { width: 100%; padding: 13px; background: #ecfdf5; color: #059669; border: 1.5px dashed #6ee7b7; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 8px; }
+.btn-add:active { background: #d1fae5; }
+.btn-submit { width: 100%; padding: 16px; background: #10b981; color: #fff; border: none; border-radius: 12px; font-size: 17px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.btn-submit:active { background: #059669; }
+.btn-submit:disabled { background: #6ee7b7; }
+</style>
+</head>
+<body>
+<div class="header">
+  <a href="/" class="back">‹</a>
+  <h1>✏️ 手入力モード</h1>
+</div>
+<div class="content">
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="POST" action="/manual/create" id="mainForm">
+    <div class="section">
+      <div class="section-title">① 納品書ファイル</div>
+      <label>BOXから選択</label>
+      <select name="delivery_file_id" required>
+        <option value="">— 選択してください —</option>
+        {% for f in delivery_files %}
+        <option value="{{ f.id }}">{{ f.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="section">
+      <div class="section-title">② 日付</div>
+      <div class="date-row">
+        <input type="text" name="date_str" placeholder="例: 0527" maxlength="4" inputmode="numeric" required>
+        <span>（月日4桁）</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">③ 商品入力</div>
+      <div id="itemList"></div>
+      <button type="button" class="btn-add" onclick="addItem()">＋ 商品を追加</button>
+    </div>
+
+    <button type="submit" class="btn-submit" id="btnSubmit">
+      納品書を作成・送信する
+    </button>
+  </form>
+</div>
+
+<script>
+let itemCount = 0;
+
+function addItem() {
+  const list = document.getElementById('itemList');
+  const div = document.createElement('div');
+  div.className = 'item-card';
+  div.id = 'item-' + itemCount;
+  div.innerHTML = `
+    <button type="button" class="del-btn" onclick="removeItem('item-${itemCount}')">×</button>
+    <div class="full">
+      <div class="field-label">区分</div>
+      <input type="text" name="kubun[]" placeholder="例: 1000円均一">
+    </div>
+    <div class="item-grid">
+      <div>
+        <div class="field-label">商品コード</div>
+        <input type="text" name="code[]" placeholder="001000" inputmode="numeric" required>
+      </div>
+      <div>
+        <div class="field-label">品番</div>
+        <input type="text" name="hinban[]" placeholder="">
+      </div>
+      <div class="full">
+        <div class="field-label">品名</div>
+        <input type="text" name="name[]" placeholder="商品名">
+      </div>
+      <div>
+        <div class="field-label">数量</div>
+        <input type="number" name="qty[]" placeholder="0" min="0" inputmode="numeric" required>
+      </div>
+      <div>
+        <div class="field-label">単価（税抜）</div>
+        <input type="number" name="price[]" placeholder="730" min="0" inputmode="numeric">
+      </div>
+    </div>
+  `;
+  list.appendChild(div);
+  itemCount++;
+}
+
+function removeItem(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+document.getElementById('mainForm').addEventListener('submit', function() {
+  const btn = document.getElementById('btnSubmit');
+  btn.disabled = true;
+  btn.textContent = '処理中...';
+});
+
+// 初期行を1つ追加
+addItem();
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>完了 — 稲穂納品書</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.card { background: #fff; border-radius: 16px; padding: 36px 28px; width: 100%; max-width: 400px; box-shadow: 0 4px 24px rgba(0,0,0,0.10); text-align: center; }
+.icon { font-size: 56px; margin-bottom: 16px; }
+h2 { font-size: 22px; color: #1a2332; margin-bottom: 8px; }
+.sub { color: #7a8ca0; font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
+.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f4f8; font-size: 14px; }
+.info-row:last-of-type { border-bottom: none; }
+.info-label { color: #7a8ca0; }
+.info-value { color: #1a2332; font-weight: 600; }
+.actions { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; }
+.btn { display: block; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 700; text-decoration: none; text-align: center; border: none; cursor: pointer; }
+.btn-primary { background: #3b82f6; color: #fff; }
+.btn-outline { background: #fff; color: #4a5568; border: 1.5px solid #d0dae6; }
+.btn:active { opacity: 0.85; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">✅</div>
+  <h2>作成完了！</h2>
+  <p class="sub">納品書をBOXに保存し、<br>メールで送信しました。</p>
+
+  <div class="info-row">
+    <span class="info-label">ファイル名</span>
+    <span class="info-value">{{ filename }}</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">店舗</span>
+    <span class="info-value">{{ store }}</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">日付</span>
+    <span class="info-value">{{ date_str }}</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">商品数</span>
+    <span class="info-value">{{ item_count }} 件</span>
+  </div>
+
+  <div class="actions">
+    <a href="/normal" class="btn btn-primary">続けて通常モードで作成</a>
+    <a href="/" class="btn btn-outline">トップに戻る</a>
+  </div>
+</div>
+</body>
+</html>

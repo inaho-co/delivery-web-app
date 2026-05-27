@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>稲穂納品書</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; }
+.header { background: #1a2332; color: #fff; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 18px; }
+.logout { color: #94a3b8; font-size: 13px; text-decoration: none; }
+.content { padding: 32px 20px; max-width: 480px; margin: 0 auto; }
+.sub { color: #7a8ca0; font-size: 14px; margin-bottom: 32px; }
+.btn { display: block; width: 100%; padding: 22px 20px; border-radius: 14px; border: none; font-size: 17px; font-weight: 700; cursor: pointer; text-align: left; text-decoration: none; margin-bottom: 16px; }
+.btn-normal { background: #3b82f6; color: #fff; }
+.btn-manual { background: #10b981; color: #fff; }
+.btn:active { opacity: 0.85; }
+.btn .icon { font-size: 28px; display: block; margin-bottom: 6px; }
+.btn .desc { font-size: 13px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🌾 稲穂納品書</h1>
+  <a href="/logout" class="logout">ログアウト</a>
+</div>
+<div class="content">
+  <p class="sub">モードを選択してください</p>
+  <a href="/normal" class="btn btn-normal">
+    <span class="icon">📋</span>
+    通常モード
+    <div class="desc">発注書Excelから自動で納品書を作成</div>
+  </a>
+  <a href="/manual" class="btn btn-manual">
+    <span class="icon">✏️</span>
+    手入力モード
+    <div class="desc">発注書なし・商品を手動で入力して作成</div>
+  </a>
+</div>
+</body>
+</html>
