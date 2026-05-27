@@ -16,35 +16,16 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # バージョン管理（Semantic Versioning）
-VERSION = "1.1.2"
+VERSION = "1.2.0"
 
-# ── BOX トークン（インメモリ保持） ──────────────────────────────
-_tokens = {
-    'access': os.environ.get('BOX_ACCESS_TOKEN', ''),
-    'refresh': os.environ.get('BOX_REFRESH_TOKEN', ''),
-}
-_token_lock = threading.Lock()
-
-
-def _store_tokens(access_token, refresh_token):
-    with _token_lock:
-        _tokens['access'] = access_token
-        _tokens['refresh'] = refresh_token
-
-
+# ── BOX JWT 認証 ────────────────────────────────────────────────────
 def _get_box_client():
-    from boxsdk import OAuth2, Client
-    with _token_lock:
-        a = _tokens['access']
-        r = _tokens['refresh']
-    oauth = OAuth2(
-        client_id=os.environ['BOX_CLIENT_ID'],
-        client_secret=os.environ['BOX_CLIENT_SECRET'],
-        access_token=a,
-        refresh_token=r,
-        store_tokens=_store_tokens,
-    )
-    return Client(oauth)
+    from boxsdk import JWTAuth, Client
+    import json
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+    auth = JWTAuth.from_settings_dictionary(config)
+    return Client(auth)
 
 
 def _list_excel_files(folder_id):
