@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # バージョン管理（Semantic Versioning）
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 
 # ── BOX JWT 認証 ────────────────────────────────────────────────────
 def _get_box_client():
