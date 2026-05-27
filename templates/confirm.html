@@ -65,9 +65,9 @@ td input.text-left { text-align: left; }
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
   <div class="info-bar">
-    <span>店舗: <strong>{{ preview.store_name }}</strong></span>
-    <span>日付: <strong>{{ preview.date_str[:2] }}/{{ preview.date_str[2:] }}</strong></span>
-    <span>ファイル: <strong>{{ preview.delivery_filename }}</strong></span>
+    <span>店舗: <strong>{{ preview['store_name'] }}</strong></span>
+    <span>日付: <strong>{{ preview['date_str'][:2] }}/{{ preview['date_str'][2:] }}</strong></span>
+    <span>ファイル: <strong>{{ preview['delivery_filename'] }}</strong></span>
   </div>
 
   <!-- 商品テーブル（インライン編集） -->
@@ -88,7 +88,7 @@ td input.text-left { text-align: left; }
           </tr>
         </thead>
         <tbody id="itemBody">
-          {% for item in preview.items %}
+          {% for item in preview['items'] %}
           <tr>
             <td><input type="text" name="kubun[]" value="{{ item.kubun }}" class="text-left" style="width:60px"></td>
             <td><input type="text" name="code[]"  value="{{ item.code }}"  class="text-left" style="width:72px" inputmode="numeric"></td>
