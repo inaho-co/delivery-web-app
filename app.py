@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # バージョン管理（Semantic Versioning）
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 # ── BOX トークン（インメモリ保持） ──────────────────────────────
 _tokens = {
