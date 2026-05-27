@@ -2,6 +2,7 @@ services:
   - type: web
     name: delivery-web-app
     env: python
+    autoDeploy: yes
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
