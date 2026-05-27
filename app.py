@@ -132,7 +132,16 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    import subprocess
+    try:
+        version = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            text=True
+        ).strip()
+    except Exception:
+        version = 'unknown'
+    return render_template('index.html', version=version)
 
 
 # ── 通常モード ─────────────────────────────────────────────────

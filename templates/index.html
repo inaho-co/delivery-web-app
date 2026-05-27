@@ -19,6 +19,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
 .btn:active { opacity: 0.85; }
 .btn .icon { font-size: 28px; display: block; margin-bottom: 6px; }
 .btn .desc { font-size: 13px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
+.version { position: fixed; bottom: 12px; right: 12px; font-size: 11px; color: #94a3b8; background: rgba(26, 35, 50, 0.8); padding: 4px 8px; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -44,5 +45,6 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
     <div class="desc">FAX発注書の数量確認・保存 → 通常モードへ</div>
   </a>
 </div>
+<div class="version">v{{ version }}</div>
 </body>
 </html>
