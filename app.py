@@ -82,6 +82,17 @@ def _upload_box_file(folder_id, filename, file_bytes):
     return client.folder(folder_id).upload_stream(io.BytesIO(file_bytes), filename).id
 
 
+def _upload_or_update_box_file(folder_id, filename, file_bytes):
+    """同名ファイルが存在すれば上書き更新、なければ新規アップロード"""
+    client = _get_box_client()
+    folder = client.folder(folder_id)
+    for item in folder.get_items(limit=200):
+        if item.type == 'file' and item.name == filename:
+            client.file(item.id).update_contents_with_stream(io.BytesIO(file_bytes))
+            return item.id
+    return folder.upload_stream(io.BytesIO(file_bytes), filename).id
+
+
 def _send_email(file_bytes, filename, store_name, date_str):
     gmail_user = 'tomo.dream69@gmail.com'
     gmail_password = os.environ['GMAIL_APP_PASSWORD']
@@ -97,7 +108,7 @@ def _send_email(file_bytes, filename, store_name, date_str):
     part = MIMEBase('application', 'octet-stream')
     part.set_payload(file_bytes)
     encoders.encode_base64(part)
-    part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+    part.add_header('Content-Disposition', 'attachment', filename=filename)
     msg.attach(part)
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
@@ -627,7 +638,7 @@ def fax_save():
         orig_filename = _get_box_file_name(order_file_id)
         base, ext = os.path.splitext(orig_filename)
         new_filename = base + '_数量確定' + ext
-        new_file_id = _upload_box_file(order_folder_id, new_filename, file_bytes)
+        new_file_id = _upload_or_update_box_file(order_folder_id, new_filename, file_bytes)
         session['fax_order_file_id'] = new_file_id
         return redirect(url_for('normal'))
     except Exception as e:
