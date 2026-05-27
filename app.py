@@ -16,13 +16,16 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # バージョン管理（Semantic Versioning）
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 # ── BOX JWT 認証 ────────────────────────────────────────────────────
 def _get_box_client():
     from boxsdk import JWTAuth, Client
     import json
-    with open('config.json', 'r') as f:
+    config_path = '/etc/secrets/config.json'
+    if not os.path.exists(config_path):
+        config_path = 'config.json'
+    with open(config_path, 'r') as f:
         config = json.load(f)
     auth = JWTAuth.from_settings_dictionary(config)
     return Client(auth)
