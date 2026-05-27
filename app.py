@@ -67,9 +67,19 @@ def _download_to_temp(file_id, suffix='.xlsx'):
     return path
 
 
+def _get_box_file_name(file_id):
+    client = _get_box_client()
+    return client.file(file_id).get().name
+
+
 def _update_box_file(file_id, file_bytes):
     client = _get_box_client()
     client.file(file_id).update_contents_with_stream(io.BytesIO(file_bytes))
+
+
+def _upload_box_file(folder_id, filename, file_bytes):
+    client = _get_box_client()
+    return client.folder(folder_id).upload_stream(io.BytesIO(file_bytes), filename).id
 
 
 def _send_email(file_bytes, filename, store_name, date_str):
@@ -506,6 +516,7 @@ def fax_save():
 
     tmp = output_tmp = None
     try:
+        order_folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
         tmp = _download_to_temp(order_file_id, suffix='.xlsx')
         fd, output_tmp = _tempfile.mkstemp(suffix='.xlsx')
         os.close(fd)
@@ -513,8 +524,11 @@ def fax_save():
         _write_fax_quantities(output_tmp, stores, quantities)
         with open(output_tmp, 'rb') as f:
             file_bytes = f.read()
-        _update_box_file(order_file_id, file_bytes)
-        session['fax_order_file_id'] = order_file_id
+        orig_filename = _get_box_file_name(order_file_id)
+        base, ext = os.path.splitext(orig_filename)
+        new_filename = base + '_数量確定' + ext
+        new_file_id = _upload_box_file(order_folder_id, new_filename, file_bytes)
+        session['fax_order_file_id'] = new_file_id
         return redirect(url_for('normal'))
     except Exception as e:
         order_folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
