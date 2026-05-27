@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>確認・編集 — 稲穂事務ツールWEB版</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; }
+.header { background: #1a2332; color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+.back { color: #94a3b8; text-decoration: none; font-size: 22px; }
+.header h1 { font-size: 17px; }
+.content { padding: 20px; max-width: 600px; margin: 0 auto; }
+.error { background: #fef2f2; color: #dc2626; border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
+.info-bar { background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.info-bar span { font-size: 14px; color: #4a5568; }
+.info-bar strong { color: #1a2332; }
+.section { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 16px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+.section-title { font-size: 12px; font-weight: 700; color: #3b82f6; text-transform: uppercase;
+  letter-spacing: .05em; margin-bottom: 12px; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
+th { background: #f8fafc; color: #64748b; font-weight: 700; padding: 8px 6px;
+  border-bottom: 2px solid #e2e8f0; text-align: center; white-space: nowrap; }
+td { padding: 6px 4px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+td input { width: 100%; padding: 6px 8px; border: 1.5px solid #d0dae6; border-radius: 7px;
+  font-size: 13px; outline: none; text-align: right; background: #fff; }
+td input:focus { border-color: #3b82f6; background: #eff6ff; }
+td input.text-left { text-align: left; }
+.amount-cell { text-align: right; font-weight: 600; color: #1a2332; padding-right: 8px; white-space: nowrap; }
+.del-btn { background: none; border: none; color: #ef4444; font-size: 18px; cursor: pointer;
+  padding: 4px 6px; line-height: 1; }
+.del-btn:active { opacity: 0.6; }
+.total-row td { border-top: 2px solid #cbd5e1; background: #f8fafc; font-weight: 700; padding: 10px 6px; }
+.total-label { text-align: right; color: #64748b; font-size: 13px; }
+.total-value { text-align: right; font-size: 16px; color: #1a2332; padding-right: 8px; }
+.add-row-btn { width: 100%; padding: 10px; background: #f0f9ff; color: #0369a1; border: 1.5px dashed #7dd3fc;
+  border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+.add-row-btn:active { background: #e0f2fe; }
+.actions { display: flex; flex-direction: column; gap: 10px; }
+.btn { display: block; width: 100%; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 700;
+  text-align: center; border: none; cursor: pointer; text-decoration: none; }
+.btn-primary { background: #3b82f6; color: #fff; }
+.btn-primary:active { background: #2563eb; }
+.btn-primary:disabled { background: #93c5fd; }
+.btn-green { background: #16a34a; color: #fff; }
+.btn-green:active { background: #15803d; }
+.btn-outline { background: #fff; color: #4a5568; border: 1.5px solid #d0dae6; }
+.btn-outline:active { background: #f8fafc; }
+.upload-area { border: 1.5px dashed #94a3b8; border-radius: 10px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px; }
+.upload-area label { font-size: 13px; color: #64748b; font-weight: 600; }
+.upload-area input[type=file] { font-size: 13px; }
+.hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <a href="/" class="back">‹</a>
+  <h1>🔍 確認・編集</h1>
+</div>
+<div class="content">
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <div class="info-bar">
+    <span>店舗: <strong>{{ preview.store_name }}</strong></span>
+    <span>日付: <strong>{{ preview.date_str[:2] }}/{{ preview.date_str[2:] }}</strong></span>
+    <span>ファイル: <strong>{{ preview.delivery_filename }}</strong></span>
+  </div>
+
+  <!-- 商品テーブル（インライン編集） -->
+  <div class="section">
+    <div class="section-title">① 商品内容を確認・修正</div>
+    <div class="table-wrap">
+      <table id="itemTable">
+        <thead>
+          <tr>
+            <th>区分</th>
+            <th>コード</th>
+            <th>品名</th>
+            <th>品番</th>
+            <th>数量</th>
+            <th>単価</th>
+            <th>金額</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="itemBody">
+          {% for item in preview.items %}
+          <tr>
+            <td><input type="text" name="kubun[]" value="{{ item.kubun }}" class="text-left" style="width:60px"></td>
+            <td><input type="text" name="code[]"  value="{{ item.code }}"  class="text-left" style="width:72px" inputmode="numeric"></td>
+            <td><input type="text" name="name[]"  value="{{ item.name }}"  class="text-left" style="width:120px"></td>
+            <td><input type="text" name="hinban[]" value="{{ item.hinban }}" class="text-left" style="width:72px"></td>
+            <td><input type="number" name="qty[]" value="{{ item.qty }}" min="0" style="width:56px" oninput="calcRow(this)" inputmode="numeric"></td>
+            <td><input type="number" name="price[]" value="{{ item.price }}" min="0" style="width:64px" oninput="calcRow(this)" inputmode="numeric"></td>
+            <td class="amount-cell">¥<span class="amt">{{ '{:,}'.format(item.qty * item.price) }}</span></td>
+            <td><button type="button" class="del-btn" onclick="delRow(this)">×</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="6" class="total-label">合計</td>
+            <td class="total-value">¥<span id="totalAmt">0</span></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <button type="button" class="add-row-btn" onclick="addRow()">＋ 行を追加</button>
+  </div>
+
+  <div class="actions">
+    <!-- Excelダウンロード -->
+    <a href="/confirm/download" class="btn btn-outline" target="_blank">📥 Excelをダウンロードして確認</a>
+
+    <!-- 編集済みExcelをアップロード -->
+    <div class="section" style="padding: 14px 16px; margin-bottom: 0;">
+      <div class="section-title">② 編集済みExcelをアップロードして保存</div>
+      <form method="POST" action="/confirm/upload" enctype="multipart/form-data">
+        <div class="upload-area">
+          <label>手元で編集したExcelファイル（.xlsx）</label>
+          <input type="file" name="excel_file" accept=".xlsx,.xlsm" required>
+          <p class="hint">ダウンロード→手元で編集→このフォームからアップロードするとそのままBoxに保存されます</p>
+        </div>
+        <button type="submit" class="btn btn-green" style="margin-top: 10px;">
+          📤 このExcelをBoxに保存・メール送信
+        </button>
+      </form>
+    </div>
+
+    <!-- インライン編集で確定 -->
+    <form method="POST" action="/confirm/save" id="saveForm">
+      <!-- テーブルの入力値をhidden経由で送信（テーブル自体はform外なので同期する） -->
+      <div id="hiddenItems"></div>
+      <button type="submit" class="btn btn-primary" onclick="syncItems(event)">
+        ✅ 上の表の内容でBoxに保存・メール送信
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function calcRow(input) {
+  const row = input.closest('tr');
+  const qty = parseInt(row.querySelector('input[name="qty[]"]').value) || 0;
+  const price = parseInt(row.querySelector('input[name="price[]"]').value) || 0;
+  row.querySelector('.amt').textContent = (qty * price).toLocaleString();
+  calcTotal();
+}
+
+function calcTotal() {
+  let total = 0;
+  document.querySelectorAll('#itemBody tr').forEach(row => {
+    const qty = parseInt(row.querySelector('input[name="qty[]"]').value) || 0;
+    const price = parseInt(row.querySelector('input[name="price[]"]').value) || 0;
+    total += qty * price;
+  });
+  document.getElementById('totalAmt').textContent = total.toLocaleString();
+}
+
+function delRow(btn) {
+  const row = btn.closest('tr');
+  row.remove();
+  calcTotal();
+}
+
+function addRow() {
+  const tbody = document.getElementById('itemBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" name="kubun[]" class="text-left" style="width:60px"></td>
+    <td><input type="text" name="code[]"  class="text-left" style="width:72px" inputmode="numeric"></td>
+    <td><input type="text" name="name[]"  class="text-left" style="width:120px"></td>
+    <td><input type="text" name="hinban[]" class="text-left" style="width:72px"></td>
+    <td><input type="number" name="qty[]" min="0" style="width:56px" oninput="calcRow(this)" inputmode="numeric"></td>
+    <td><input type="number" name="price[]" min="0" style="width:64px" oninput="calcRow(this)" inputmode="numeric"></td>
+    <td class="amount-cell">¥<span class="amt">0</span></td>
+    <td><button type="button" class="del-btn" onclick="delRow(this)">×</button></td>
+  `;
+  tbody.appendChild(tr);
+  tr.querySelector('input[name="kubun[]"]').focus();
+}
+
+function syncItems(e) {
+  const container = document.getElementById('hiddenItems');
+  container.innerHTML = '';
+  document.querySelectorAll('#itemBody tr').forEach(row => {
+    const fields = ['kubun[]', 'code[]', 'name[]', 'hinban[]', 'qty[]', 'price[]'];
+    fields.forEach(name => {
+      const val = row.querySelector(`input[name="${name}"]`)?.value || '';
+      const hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = name;
+      hidden.value = val;
+      container.appendChild(hidden);
+    });
+  });
+}
+
+// 初期合計計算
+calcTotal();
+
+// 保存ボタンのダブルクリック防止
+document.getElementById('saveForm').addEventListener('submit', function() {
+  this.querySelector('button[type=submit]').disabled = true;
+  this.querySelector('button[type=submit]').textContent = '処理中...';
+});
+</script>
+</body>
+</html>

@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # バージョン管理（Semantic Versioning）
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # ── BOX トークン（インメモリ保持） ──────────────────────────────
 _tokens = {
@@ -196,7 +196,7 @@ def normal_create():
         return render_template('normal.html', error='入力が不足しています',
                                order_files=[], delivery_files=[])
 
-    order_tmp = delivery_tmp = output_tmp = None
+    order_tmp = delivery_tmp = None
     try:
         order_tmp = _download_to_temp(order_file_id, suffix='.xlsx')
         delivery_tmp = _download_to_temp(delivery_file_id, suffix='.xlsx')
@@ -209,33 +209,22 @@ def normal_create():
                                    error=f'「{store_name}」の商品データが見つかりませんでした',
                                    order_files=[], delivery_files=[])
 
-        fd, output_tmp = tempfile.mkstemp(suffix='.xlsx')
-        os.close(fd)
-
-        sheet_name, wb = core_transfer.add_delivery_sheet(
-            delivery_tmp, items, date_str, output_tmp, price_map)
-        wb.save(output_tmp)
-
-        with open(output_tmp, 'rb') as f:
-            file_bytes = f.read()
-
-        _update_box_file(delivery_file_id, file_bytes)
-
-        client = _get_box_client()
-        delivery_filename = client.file(delivery_file_id).get().name
-        _send_email(file_bytes, delivery_filename, store_name, date_str)
-
-        return render_template('success.html',
-                               filename=delivery_filename,
-                               store=store_name,
-                               date_str=date_str,
-                               item_count=len(items))
+        delivery_filename = _get_box_file_name(delivery_file_id)
+        session['preview'] = {
+            'delivery_file_id': delivery_file_id,
+            'store_name': store_name,
+            'date_str': date_str,
+            'items': items,
+            'delivery_filename': delivery_filename,
+            'price_map': price_map,
+        }
+        return redirect(url_for('confirm'))
 
     except Exception as e:
         return render_template('normal.html', error=f'エラー: {e}',
                                order_files=[], delivery_files=[])
     finally:
-        _cleanup(order_tmp, delivery_tmp, output_tmp)
+        _cleanup(order_tmp, delivery_tmp)
 
 
 # ── 手入力モード ───────────────────────────────────────────────
@@ -286,34 +275,145 @@ def manual_create():
         return render_template('manual.html', error='入力が不足しています（商品は1行以上必要です）',
                                delivery_files=[])
 
-    delivery_tmp = output_tmp = None
     try:
-        delivery_tmp = _download_to_temp(delivery_file_id, suffix='.xlsx')
-        fd, output_tmp = tempfile.mkstemp(suffix='.xlsx')
-        os.close(fd)
-
-        sheet_name, wb = core_transfer.add_delivery_sheet(
-            delivery_tmp, items, date_str, output_tmp)
-        wb.save(output_tmp)
-
-        with open(output_tmp, 'rb') as f:
-            file_bytes = f.read()
-
-        _update_box_file(delivery_file_id, file_bytes)
-
-        client = _get_box_client()
-        delivery_filename = client.file(delivery_file_id).get().name
-        _send_email(file_bytes, delivery_filename, '手入力', date_str)
-
-        return render_template('success.html',
-                               filename=delivery_filename,
-                               store='手入力',
-                               date_str=date_str,
-                               item_count=len(items))
-
+        delivery_filename = _get_box_file_name(delivery_file_id)
+        session['preview'] = {
+            'delivery_file_id': delivery_file_id,
+            'store_name': '手入力',
+            'date_str': date_str,
+            'items': items,
+            'delivery_filename': delivery_filename,
+            'price_map': {},
+        }
+        return redirect(url_for('confirm'))
     except Exception as e:
         return render_template('manual.html', error=f'エラー: {e}',
                                delivery_files=[])
+
+
+# ── 確認・編集画面 ─────────────────────────────────────────────
+
+@app.route('/confirm')
+@login_required
+def confirm():
+    preview = session.get('preview')
+    if not preview:
+        return redirect(url_for('index'))
+    return render_template('confirm.html', preview=preview, error=None)
+
+
+@app.route('/confirm/download')
+@login_required
+def confirm_download():
+    preview = session.get('preview')
+    if not preview:
+        return redirect(url_for('index'))
+    delivery_tmp = output_tmp = None
+    try:
+        delivery_tmp = _download_to_temp(preview['delivery_file_id'], suffix='.xlsx')
+        fd, output_tmp = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        sheet_name, wb = core_transfer.add_delivery_sheet(
+            delivery_tmp, preview['items'], preview['date_str'],
+            output_tmp, preview.get('price_map') or {})
+        wb.save(output_tmp)
+        with open(output_tmp, 'rb') as f:
+            file_bytes = f.read()
+        from flask import send_file
+        return send_file(
+            io.BytesIO(file_bytes),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=preview['delivery_filename'],
+        )
+    except Exception as e:
+        return f'ダウンロードエラー: {e}', 500
+    finally:
+        _cleanup(delivery_tmp, output_tmp)
+
+
+@app.route('/confirm/upload', methods=['POST'])
+@login_required
+def confirm_upload():
+    preview = session.get('preview')
+    if not preview:
+        return redirect(url_for('index'))
+    uploaded = request.files.get('excel_file')
+    if not uploaded:
+        return render_template('confirm.html', preview=preview, error='ファイルが選択されていません')
+    file_bytes = uploaded.read()
+    try:
+        _update_box_file(preview['delivery_file_id'], file_bytes)
+        _send_email(file_bytes, preview['delivery_filename'],
+                    preview['store_name'], preview['date_str'])
+        session.pop('preview', None)
+        return render_template('success.html',
+                               filename=preview['delivery_filename'],
+                               store=preview['store_name'],
+                               date_str=preview['date_str'],
+                               item_count=len(preview['items']))
+    except Exception as e:
+        return render_template('confirm.html', preview=preview, error=f'保存エラー: {e}')
+
+
+@app.route('/confirm/save', methods=['POST'])
+@login_required
+def confirm_save():
+    preview = session.get('preview')
+    if not preview:
+        return redirect(url_for('index'))
+
+    kubuns  = request.form.getlist('kubun[]')
+    codes   = request.form.getlist('code[]')
+    names   = request.form.getlist('name[]')
+    hinbans = request.form.getlist('hinban[]')
+    qtys    = request.form.getlist('qty[]')
+    prices  = request.form.getlist('price[]')
+
+    items = []
+    for i in range(len(codes)):
+        try:
+            qty = int(qtys[i]) if qtys[i] else 0
+            price = int(prices[i]) if prices[i] else 0
+            if codes[i]:
+                items.append({
+                    'kubun':  kubuns[i] if i < len(kubuns) else '',
+                    'code':   codes[i],
+                    'name':   names[i] if i < len(names) else '',
+                    'hinban': hinbans[i] if i < len(hinbans) else '',
+                    'qty':    qty,
+                    'price':  price,
+                    'amount': qty * price,
+                })
+        except (ValueError, IndexError):
+            continue
+
+    if not items:
+        return render_template('confirm.html', preview=preview, error='商品が1行以上必要です')
+
+    delivery_tmp = output_tmp = None
+    try:
+        delivery_tmp = _download_to_temp(preview['delivery_file_id'], suffix='.xlsx')
+        fd, output_tmp = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        sheet_name, wb = core_transfer.add_delivery_sheet(
+            delivery_tmp, items, preview['date_str'],
+            output_tmp, preview.get('price_map') or {})
+        wb.save(output_tmp)
+        with open(output_tmp, 'rb') as f:
+            file_bytes = f.read()
+        _update_box_file(preview['delivery_file_id'], file_bytes)
+        _send_email(file_bytes, preview['delivery_filename'],
+                    preview['store_name'], preview['date_str'])
+        session.pop('preview', None)
+        return render_template('success.html',
+                               filename=preview['delivery_filename'],
+                               store=preview['store_name'],
+                               date_str=preview['date_str'],
+                               item_count=len(items))
+    except Exception as e:
+        preview['items'] = items
+        return render_template('confirm.html', preview=preview, error=f'エラー: {e}')
     finally:
         _cleanup(delivery_tmp, output_tmp)
 
