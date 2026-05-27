@@ -15,6 +15,9 @@ import core_transfer
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
+# バージョン管理（Semantic Versioning）
+VERSION = "1.0.0"
+
 # ── BOX トークン（インメモリ保持） ──────────────────────────────
 _tokens = {
     'access': os.environ.get('BOX_ACCESS_TOKEN', ''),
@@ -132,16 +135,7 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    import subprocess
-    try:
-        version = subprocess.check_output(
-            ['git', 'rev-parse', '--short', 'HEAD'],
-            cwd=os.path.dirname(os.path.abspath(__file__)),
-            text=True
-        ).strip()
-    except Exception:
-        version = 'unknown'
-    return render_template('index.html', version=version)
+    return render_template('index.html', version=VERSION)
 
 
 # ── 通常モード ─────────────────────────────────────────────────
