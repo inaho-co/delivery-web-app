@@ -96,11 +96,19 @@ scp -O app.py nastom@192.168.0.220:/volume1/webapp/
 - JWT は個人BOXアカウントでは使用不可（エンタープライズ専用）
 - トークン失効は60日以上未使用の場合のみ → `box_auth.py` で再取得
 
+## 安定運用の注意事項
+
+- **`use_reloader=False` 必須**：`app.run()` に必ず付ける。ないとSCPでapp.pyを転送するたびにFlaskのstat reloaderが自動リロードを試みてクラッシュする
+- **`start.sh` に `nohup` 必須**：ないとSSH切断でFlaskプロセスが死ぬ
+- **Windows CMDで`&`を含むSSHコマンドは動かない**：`&`を含む処理はstart.sh内に閉じ込め、SSH経由では `sh /volume1/webapp/start.sh` のみ実行する
+- **start.shはSCPで転送するとCRLF問題が発生する**：変更が必要な場合はNAS上でprintfコマンドで直接作成する
+
 ## トラブルシューティング
 
 - **BOX 認証エラー**：`box_auth.py` でトークン再取得 → `.env` を更新 → 再起動
 - **アプリが起動しない**：SSH で `sh /volume1/webapp/start.sh` を手動実行
 - **外出先からアクセスできない**：OpenVPN Connect がオンになっているか確認
+- **Gmail SMTP エラー**：Googleのアプリパスワードは4文字区切り表示なのでスペースなしでコピーすること
 
 ---
 
