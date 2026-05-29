@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # バージョン管理（Semantic Versioning）
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 # ── BOX OAuth2 認証（トークン自動保存） ─────────────────────────────
 _TOKEN_FILE = '/volume1/webapp/box_tokens.json'
@@ -464,20 +464,22 @@ def confirm_save():
         with open(output_tmp, 'rb') as f:
             file_bytes = f.read()
         _update_box_file(preview['delivery_file_id'], file_bytes)
-        _send_email(file_bytes, preview['delivery_filename'],
-                    preview['store_name'], preview['date_str'])
-        threading.Thread(
-            target=_add_notion_delivery_record,
-            args=(preview['store_name'], preview['date_str'], len(items)),
-            daemon=True,
-        ).start()
+        send_email = request.form.get('send_email', '0') == '1'
+        if send_email:
+            _send_email(file_bytes, preview['delivery_filename'],
+                        preview['store_name'], preview['date_str'])
+            threading.Thread(
+                target=_add_notion_delivery_record,
+                args=(preview['store_name'], preview['date_str'], len(items)),
+                daemon=True,
+            ).start()
         session.pop('preview', None)
         return render_template('success.html',
                                filename=preview['delivery_filename'],
                                store=preview['store_name'],
                                date_str=preview['date_str'],
                                item_count=len(items),
-                               notion_sent=True)
+                               notion_sent=send_email)
     except Exception as e:
         preview['items'] = items
         return render_template('confirm.html', preview=preview, error=f'エラー: {e}')

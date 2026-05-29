@@ -70,9 +70,13 @@ td input.text-left { text-align: left; }
     <span>ファイル: <strong>{{ preview['delivery_filename'] }}</strong></span>
   </div>
 
-  <!-- 商品テーブル（インライン編集） -->
-  <div class="section">
-    <div class="section-title">① 商品内容を確認・修正</div>
+  <!-- 商品テーブル（折りたたみ・インライン編集） -->
+  <details class="section" style="padding:0;">
+    <summary style="padding:16px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
+      <span class="section-title" style="margin:0;">商品内容を修正する</span>
+      <span style="color:#94a3b8; font-size:13px;">タップで開閉 ▼</span>
+    </summary>
+    <div style="padding:0 16px 16px;">
     <div class="table-wrap">
       <table id="itemTable">
         <thead>
@@ -111,36 +115,20 @@ td input.text-left { text-align: left; }
       </table>
     </div>
     <button type="button" class="add-row-btn" onclick="addRow()">＋ 行を追加</button>
-  </div>
+    </div>
+  </details>
 
   <div class="actions">
-    <!-- PDFプレビュー -->
     <a href="/confirm/pdf" class="btn btn-outline" target="_blank">📄 PDFで内容を確認（新規タブ）</a>
 
-    <!-- Excelダウンロード -->
-    <a href="/confirm/download" class="btn btn-outline" target="_blank">📥 Excelをダウンロードして確認</a>
-
-    <!-- 編集済みExcelをアップロード -->
-    <div class="section" style="padding: 14px 16px; margin-bottom: 0;">
-      <div class="section-title">② 編集済みExcelをアップロードして保存</div>
-      <form method="POST" action="/confirm/upload" enctype="multipart/form-data">
-        <div class="upload-area">
-          <label>手元で編集したExcelファイル（.xlsx）</label>
-          <input type="file" name="excel_file" accept=".xlsx,.xlsm" required>
-          <p class="hint">ダウンロード→手元で編集→このフォームからアップロードするとそのままBoxに保存されます</p>
-        </div>
-        <button type="submit" class="btn btn-green" style="margin-top: 10px;">
-          📤 このExcelをBoxに保存・メール送信
-        </button>
-      </form>
-    </div>
-
-    <!-- インライン編集で確定 -->
     <form method="POST" action="/confirm/save" id="saveForm">
-      <!-- テーブルの入力値をhidden経由で送信（テーブル自体はform外なので同期する） -->
       <div id="hiddenItems"></div>
-      <button type="submit" class="btn btn-primary" onclick="syncItems(event)">
-        ✅ 上の表の内容でBoxに保存・メール送信
+      <input type="hidden" name="send_email" id="sendEmailFlag" value="0">
+      <button type="button" class="btn btn-outline" onclick="submitSave(0)">
+        💾 Boxに保存のみ
+      </button>
+      <button type="button" class="btn btn-primary" onclick="submitSave(1)">
+        ✅ Boxに保存・メール送信
       </button>
     </form>
   </div>
@@ -188,7 +176,7 @@ function addRow() {
   tr.querySelector('input[name="kubun[]"]').focus();
 }
 
-function syncItems(e) {
+function syncItems() {
   const container = document.getElementById('hiddenItems');
   container.innerHTML = '';
   document.querySelectorAll('#itemBody tr').forEach(row => {
@@ -204,14 +192,16 @@ function syncItems(e) {
   });
 }
 
+function submitSave(sendEmail) {
+  document.getElementById('sendEmailFlag').value = sendEmail;
+  syncItems();
+  const form = document.getElementById('saveForm');
+  form.querySelectorAll('button').forEach(b => { b.disabled = true; b.textContent = '処理中...'; });
+  form.submit();
+}
+
 // 初期合計計算
 calcTotal();
-
-// 保存ボタンのダブルクリック防止
-document.getElementById('saveForm').addEventListener('submit', function() {
-  this.querySelector('button[type=submit]').disabled = true;
-  this.querySelector('button[type=submit]').textContent = '処理中...';
-});
 </script>
 </body>
 </html>
