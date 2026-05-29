@@ -26,7 +26,7 @@ h2 { font-size: 22px; color: #1a2332; margin-bottom: 8px; }
 <div class="card">
   <div class="icon">✅</div>
   <h2>作成完了！</h2>
-  <p class="sub">納品書をBOXに保存し、<br>メールで送信しました。</p>
+  <p class="sub">{% if notion_sent %}納品書をBOXに保存し、<br>メールで送信しました。{% else %}納品書をBOXに保存しました。{% endif %}</p>
 
   <div class="info-row">
     <span class="info-label">ファイル名</span>
