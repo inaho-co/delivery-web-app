@@ -16,18 +16,37 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # バージョン管理（Semantic Versioning）
-VERSION = "1.3.1"
+VERSION = "1.5.0"
 
-# ── BOX JWT 認証 ────────────────────────────────────────────────────
+# ── BOX OAuth2 認証（トークン自動保存） ─────────────────────────────
+_TOKEN_FILE = '/volume1/webapp/box_tokens.json'
+
+def _store_tokens(access_token, refresh_token):
+    import json as _json
+    try:
+        with open(_TOKEN_FILE, 'w') as f:
+            _json.dump({'access_token': access_token, 'refresh_token': refresh_token}, f)
+    except Exception:
+        pass
+
 def _get_box_client():
-    from boxsdk import JWTAuth, Client
-    import json
-    config_path = '/etc/secrets/config.json'
-    if not os.path.exists(config_path):
-        config_path = 'config.json'
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    auth = JWTAuth.from_settings_dictionary(config)
+    from boxsdk import OAuth2, Client
+    import json as _json
+    if os.path.exists(_TOKEN_FILE):
+        with open(_TOKEN_FILE) as f:
+            tokens = _json.load(f)
+        access_token = tokens.get('access_token', '')
+        refresh_token = tokens.get('refresh_token', os.environ['BOX_REFRESH_TOKEN'])
+    else:
+        access_token = os.environ.get('BOX_ACCESS_TOKEN', '')
+        refresh_token = os.environ['BOX_REFRESH_TOKEN']
+    auth = OAuth2(
+        client_id=os.environ['BOX_CLIENT_ID'],
+        client_secret=os.environ['BOX_CLIENT_SECRET'],
+        access_token=access_token,
+        refresh_token=refresh_token,
+        store_tokens=_store_tokens,
+    )
     return Client(auth)
 
 
@@ -107,6 +126,31 @@ def _cleanup(*paths):
                 os.unlink(p)
         except Exception:
             pass
+
+
+def _add_notion_delivery_record(store_name, date_str, item_count):
+    """Notion TODOページに納品書完了テキストを段落ブロックとして追記する。失敗しても例外を出さない。"""
+    api_key = os.environ.get('NOTION_API_KEY', '')
+    if not api_key:
+        return
+    date_display = f'{date_str[:2]}/{date_str[2:]}' if len(date_str) == 4 else date_str
+    text = f'✅ 納品書作成済 {date_display} {store_name}（{item_count}件）'
+    try:
+        import requests as _req
+        _req.patch(
+            'https://api.notion.com/v1/blocks/36670bbc-e793-81bc-89a4-c64ad3c8e1ad/children',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Notion-Version': '2022-06-28',
+                'Content-Type': 'application/json',
+            },
+            json={'children': [{'type': 'paragraph', 'paragraph': {
+                'rich_text': [{'type': 'text', 'text': {'content': text}}]
+            }}]},
+            timeout=15,
+        )
+    except Exception as e:
+        print(f'[Notion] {e}')
 
 
 # ── 認証 ───────────────────────────────────────────────────────
@@ -297,6 +341,22 @@ def confirm():
     return render_template('confirm.html', preview=preview, error=None)
 
 
+@app.route('/confirm/pdf')
+@login_required
+def confirm_pdf():
+    preview = session.get('preview')
+    if not preview:
+        return redirect(url_for('index'))
+    try:
+        pdf = core_transfer.generate_delivery_pdf(
+            preview['items'], preview['store_name'], preview['date_str'])
+        from flask import Response
+        return Response(pdf, mimetype='application/pdf',
+                        headers={'Content-Disposition': 'inline; filename="delivery.pdf"'})
+    except Exception as e:
+        return f'PDFプレビューエラー: {e}', 500
+
+
 @app.route('/confirm/download')
 @login_required
 def confirm_download():
@@ -341,12 +401,18 @@ def confirm_upload():
         _update_box_file(preview['delivery_file_id'], file_bytes)
         _send_email(file_bytes, preview['delivery_filename'],
                     preview['store_name'], preview['date_str'])
+        threading.Thread(
+            target=_add_notion_delivery_record,
+            args=(preview['store_name'], preview['date_str'], len(preview['items'])),
+            daemon=True,
+        ).start()
         session.pop('preview', None)
         return render_template('success.html',
                                filename=preview['delivery_filename'],
                                store=preview['store_name'],
                                date_str=preview['date_str'],
-                               item_count=len(preview['items']))
+                               item_count=len(preview['items']),
+                               notion_sent=True)
     except Exception as e:
         return render_template('confirm.html', preview=preview, error=f'保存エラー: {e}')
 
@@ -400,12 +466,18 @@ def confirm_save():
         _update_box_file(preview['delivery_file_id'], file_bytes)
         _send_email(file_bytes, preview['delivery_filename'],
                     preview['store_name'], preview['date_str'])
+        threading.Thread(
+            target=_add_notion_delivery_record,
+            args=(preview['store_name'], preview['date_str'], len(items)),
+            daemon=True,
+        ).start()
         session.pop('preview', None)
         return render_template('success.html',
                                filename=preview['delivery_filename'],
                                store=preview['store_name'],
                                date_str=preview['date_str'],
-                               item_count=len(items))
+                               item_count=len(items),
+                               notion_sent=True)
     except Exception as e:
         preview['items'] = items
         return render_template('confirm.html', preview=preview, error=f'エラー: {e}')
@@ -637,4 +709,4 @@ def fax_save():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5010)
+    app.run(debug=True, port=5010, host='0.0.0.0')

@@ -436,7 +436,9 @@ def add_delivery_sheet(delivery_path, items, date_str, output_path, price_map=No
     for item in items:
         if prev_kubun and item['kubun'] != prev_kubun:
             copy_row_style(tmpl, STYLE_REF_ROW, new_ws, write_row)
-            new_ws.cell(row=write_row, column=col_amount).value = 0
+            cell = new_ws.cell(row=write_row, column=col_amount)
+            cell.value = 0
+            cell.number_format = '#,##0;-#,##0;"-"'
             new_ws.row_dimensions[write_row].height = 18
             write_row += 1
 
@@ -784,3 +786,62 @@ def add_kattorikoku_delivery_sheet(delivery_path, date_str, qty_1000, qty_600, w
         wb.save(delivery_path)
 
     return sheet_name, wb
+
+
+def generate_delivery_pdf(items, store_name, date_str):
+    """納品書PDFを生成してbytesを返す。reportlab + fonts/IPAexGothic.ttf を使用。"""
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    import os as _os
+
+    font_path = _os.path.join(_os.path.dirname(__file__), 'fonts', 'IPAexGothic.ttf')
+    pdfmetrics.registerFont(TTFont('IPA', font_path))
+    F = 'IPA'
+
+    date_display = f'{date_str[:2]}/{date_str[2:]}' if len(date_str) == 4 else date_str
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=15*mm, rightMargin=15*mm,
+                            topMargin=15*mm, bottomMargin=15*mm)
+    story = [
+        Paragraph('納　品　書', ParagraphStyle('t', fontName=F, fontSize=16, alignment=1, spaceAfter=6)),
+        Spacer(1, 4*mm),
+        Paragraph(f'店舗：{store_name}　日付：{date_display}',
+                  ParagraphStyle('i', fontName=F, fontSize=11, spaceAfter=4)),
+        Spacer(1, 4*mm),
+    ]
+    col_w = [18*mm, 22*mm, 55*mm, 28*mm, 14*mm, 18*mm, 22*mm]
+    rows = [['区分', 'コード', '品名', '品番', '数量', '単価', '金額']]
+    total = 0
+    for item in items:
+        amt = item.get('amount', item['qty'] * item['price'])
+        total += amt
+        rows.append([item.get('kubun', ''), item.get('code', ''), item.get('name', ''),
+                     item.get('hinban', ''), str(item['qty']),
+                     f"{item['price']:,}", f"{amt:,}"])
+    rows.append(['', '', '', '', '', '合　計', f"{total:,}"])
+
+    tbl = Table(rows, colWidths=col_w, repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('FONTNAME',       (0, 0), (-1, -1), F),
+        ('FONTSIZE',       (0, 0), (-1, -1), 9),
+        ('BACKGROUND',     (0, 0), (-1,  0), colors.HexColor('#1a2332')),
+        ('TEXTCOLOR',      (0, 0), (-1,  0), colors.white),
+        ('ALIGN',          (4, 0), (-1, -1), 'RIGHT'),
+        ('ALIGN',          (0, 0), ( 3, -1), 'LEFT'),
+        ('GRID',           (0, 0), (-1, -2), 0.5, colors.HexColor('#e2e8f0')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f8fafc')]),
+        ('BACKGROUND',     (0, -1), (-1, -1), colors.HexColor('#f0f4f8')),
+        ('LINEABOVE',      (0, -1), (-1, -1), 1.5, colors.HexColor('#1a2332')),
+        ('TOPPADDING',     (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING',  (0, 0), (-1, -1), 4),
+    ]))
+    story.append(tbl)
+    doc.build(story)
+    return buf.getvalue()

@@ -44,6 +44,12 @@ h2 { font-size: 22px; color: #1a2332; margin-bottom: 8px; }
     <span class="info-label">商品数</span>
     <span class="info-value">{{ item_count }} 件</span>
   </div>
+  {% if notion_sent %}
+  <div class="info-row">
+    <span class="info-label">Notion</span>
+    <span class="info-value" style="color:#16a34a;">✅ TODOに記録しました</span>
+  </div>
+  {% endif %}
 
   <div class="actions">
     <a href="/normal" class="btn btn-primary">続けて通常モードで作成</a>

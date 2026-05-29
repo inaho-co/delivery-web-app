@@ -21,7 +21,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
 .section-title { font-size: 12px; font-weight: 700; color: #3b82f6; text-transform: uppercase;
   letter-spacing: .05em; margin-bottom: 12px; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
+table { border-collapse: collapse; font-size: 13px; min-width: 560px; }
 th { background: #f8fafc; color: #64748b; font-weight: 700; padding: 8px 6px;
   border-bottom: 2px solid #e2e8f0; text-align: center; white-space: nowrap; }
 td { padding: 6px 4px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
@@ -114,6 +114,9 @@ td input.text-left { text-align: left; }
   </div>
 
   <div class="actions">
+    <!-- PDFプレビュー -->
+    <a href="/confirm/pdf" class="btn btn-outline" target="_blank">📄 PDFで内容を確認（新規タブ）</a>
+
     <!-- Excelダウンロード -->
     <a href="/confirm/download" class="btn btn-outline" target="_blank">📥 Excelをダウンロードして確認</a>
 
