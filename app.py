@@ -741,11 +741,11 @@ def fax_save():
 @login_required
 def hacchu():
     if request.method == 'GET':
-        return render_template('hacchu.html', error=None, version=VERSION)
+        return render_template('hacchu.html', error=None, saved=None, version=VERSION)
 
     files = request.files.getlist('order_files')
     if not files or all(f.filename == '' for f in files):
-        return render_template('hacchu.html', error='ファイルを選択してください', version=VERSION)
+        return render_template('hacchu.html', error='ファイルを選択してください', saved=None, version=VERSION)
 
     tmp_paths = []
     try:
@@ -758,22 +758,20 @@ def hacchu():
             tmp_paths.append(tmp)
 
         if not tmp_paths:
-            return render_template('hacchu.html', error='有効なファイルがありません', version=VERSION)
+            return render_template('hacchu.html', error='有効なファイルがありません', saved=None, version=VERSION)
 
         from datetime import date
         mmdd = f"{date.today().month:02d}{date.today().day:02d}"
         output_filename = f"_稲穂_{mmdd}_発注書.xlsx"
 
         file_bytes = core_hacchu.web_merge_orders(tmp_paths)
-        from flask import send_file
-        return send_file(
-            io.BytesIO(file_bytes),
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=output_filename,
-        )
+
+        order_folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
+        _upload_or_update_box_file(order_folder_id, output_filename, file_bytes)
+
+        return render_template('hacchu.html', error=None, saved=output_filename, version=VERSION)
     except Exception as e:
-        return render_template('hacchu.html', error=f'変換エラー: {e}', version=VERSION)
+        return render_template('hacchu.html', error=f'変換エラー: {e}', saved=None, version=VERSION)
     finally:
         _cleanup(*tmp_paths)
 

@@ -34,6 +34,10 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
 .btn-back { display: block; text-align: center; color: #7a8ca0; font-size: 14px; text-decoration: none; padding: 8px; }
 .error { background: #fff5f5; border: 1px solid #fed7d7; border-radius: 10px; padding: 14px 16px; color: #c53030; font-size: 14px; margin-bottom: 20px; }
 .version { position: fixed; bottom: 12px; right: 12px; font-size: 11px; color: #94a3b8; background: rgba(26,35,50,0.8); padding: 4px 8px; border-radius: 4px; }
+.success { background: #f0fff4; border: 1px solid #9ae6b4; border-radius: 14px; padding: 20px; margin-bottom: 20px; text-align: center; }
+.success .icon { font-size: 40px; margin-bottom: 10px; }
+.success .msg { font-size: 15px; font-weight: 700; color: #276749; margin-bottom: 6px; }
+.success .fname { font-size: 13px; color: #38a169; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -44,6 +48,14 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
 <div class="content">
   <p class="page-title">🔄 発注書変換</p>
   <p class="sub">発注書Excelを追加して1つに結合します</p>
+
+  {% if saved %}
+  <div class="success">
+    <div class="icon">✅</div>
+    <div class="msg">BOXに保存しました</div>
+    <div class="fname">{{ saved }}</div>
+  </div>
+  {% endif %}
 
   {% if error %}
   <div class="error">⚠️ {{ error }}</div>
@@ -65,7 +77,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
       </p>
     </div>
 
-    <button type="submit" class="btn-convert" id="btn-submit">⚡ 変換してダウンロード</button>
+    <button type="submit" class="btn-convert" id="btn-submit">⚡ 変換してBOXに保存</button>
   </form>
 
   <a href="/" class="btn-back">← トップへ戻る</a>
@@ -132,7 +144,7 @@ document.getElementById('add-btn').addEventListener('click', () => addFileRow(tr
 document.getElementById('form').addEventListener('submit', function() {
   const btn = document.getElementById('btn-submit');
   btn.disabled = true;
-  btn.textContent = '変換中…';
+  btn.textContent = 'BOXに保存中…';
 });
 
 // 初期行を1つ追加（ファイル選択ダイアログは開かない）
