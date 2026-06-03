@@ -75,6 +75,18 @@ def _box_token_keeper():
 threading.Thread(target=_box_token_keeper, daemon=True).start()
 
 
+def _list_subfolders(folder_id):
+    """指定フォルダ直下のサブフォルダ一覧を返す。ルートフォルダ自身も先頭に含む。"""
+    client = _get_box_client()
+    folder = client.folder(folder_id).get()
+    result = [{'id': folder_id, 'name': f'📁 {folder.name}（このフォルダ）'}]
+    items = client.folder(folder_id).get_items(limit=200)
+    for item in items:
+        if item.type == 'folder':
+            result.append({'id': item.id, 'name': f'📂 {item.name}'})
+    return result
+
+
 def _list_excel_files(folder_id):
     client = _get_box_client()
     items = client.folder(folder_id).get_items(limit=200)
@@ -737,15 +749,32 @@ def fax_save():
 
 # ── 発注書変換 ──────────────────────────────────────────────────
 
+def _hacchu_folders():
+    order_folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
+    try:
+        return _list_subfolders(order_folder_id) if order_folder_id else []
+    except Exception:
+        return [{'id': order_folder_id, 'name': '📁 発注書フォルダ'}] if order_folder_id else []
+
+
 @app.route('/hacchu', methods=['GET', 'POST'])
 @login_required
 def hacchu():
     if request.method == 'GET':
-        return render_template('hacchu.html', error=None, saved=None, version=VERSION)
+        folders = _hacchu_folders()
+        return render_template('hacchu.html', error=None, saved=None,
+                               folders=folders, version=VERSION)
 
     files = request.files.getlist('order_files')
+    folder_id = request.form.get('folder_id', '').strip()
+
     if not files or all(f.filename == '' for f in files):
-        return render_template('hacchu.html', error='ファイルを選択してください', saved=None, version=VERSION)
+        folders = _hacchu_folders()
+        return render_template('hacchu.html', error='ファイルを選択してください',
+                               saved=None, folders=folders, version=VERSION)
+
+    if not folder_id:
+        folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
 
     tmp_paths = []
     try:
@@ -758,20 +787,24 @@ def hacchu():
             tmp_paths.append(tmp)
 
         if not tmp_paths:
-            return render_template('hacchu.html', error='有効なファイルがありません', saved=None, version=VERSION)
+            folders = _hacchu_folders()
+            return render_template('hacchu.html', error='有効なファイルがありません',
+                                   saved=None, folders=folders, version=VERSION)
 
         from datetime import date
         mmdd = f"{date.today().month:02d}{date.today().day:02d}"
         output_filename = f"_稲穂_{mmdd}_発注書.xlsx"
 
         file_bytes = core_hacchu.web_merge_orders(tmp_paths)
+        _upload_or_update_box_file(folder_id, output_filename, file_bytes)
 
-        order_folder_id = os.environ.get('BOX_ORDER_FOLDER_ID', '')
-        _upload_or_update_box_file(order_folder_id, output_filename, file_bytes)
-
-        return render_template('hacchu.html', error=None, saved=output_filename, version=VERSION)
+        folders = _hacchu_folders()
+        return render_template('hacchu.html', error=None, saved=output_filename,
+                               folders=folders, selected_folder=folder_id, version=VERSION)
     except Exception as e:
-        return render_template('hacchu.html', error=f'変換エラー: {e}', saved=None, version=VERSION)
+        folders = _hacchu_folders()
+        return render_template('hacchu.html', error=f'変換エラー: {e}',
+                               saved=None, folders=folders, version=VERSION)
     finally:
         _cleanup(*tmp_paths)
 

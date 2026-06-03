@@ -38,6 +38,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
 .success .icon { font-size: 40px; margin-bottom: 10px; }
 .success .msg { font-size: 15px; font-weight: 700; color: #276749; margin-bottom: 6px; }
 .success .fname { font-size: 13px; color: #38a169; word-break: break-all; }
+select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e0; font-size: 14px; color: #2d3748; background: #fff; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23718096' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
 </style>
 </head>
 <body>
@@ -75,6 +76,15 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
         ・稲穂シートと三共シートを自動で分類します<br>
         ・3店舗ごとに1シートにまとめます
       </p>
+    </div>
+
+    <div class="card">
+      <p class="card-label">💾 保存先フォルダ</p>
+      <select name="folder_id">
+        {% for f in folders %}
+        <option value="{{ f.id }}" {% if selected_folder is defined and selected_folder == f.id %}selected{% endif %}>{{ f.name }}</option>
+        {% endfor %}
+      </select>
     </div>
 
     <button type="submit" class="btn-convert" id="btn-submit">⚡ 変換してBOXに保存</button>
