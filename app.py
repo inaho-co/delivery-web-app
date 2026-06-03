@@ -11,21 +11,33 @@ from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import core_transfer
+import core_hacchu
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # バージョン管理（Semantic Versioning）
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 
 # ── BOX OAuth2 認証（トークン自動保存） ─────────────────────────────
 _TOKEN_FILE = '/volume1/webapp/box_tokens.json'
 
 def _store_tokens(access_token, refresh_token):
-    import json as _json
+    import json as _json, re
     try:
         with open(_TOKEN_FILE, 'w') as f:
             _json.dump({'access_token': access_token, 'refresh_token': refresh_token}, f)
+    except Exception:
+        pass
+    # .env も同時に更新してNAS再起動後も最新トークンを維持
+    try:
+        env_path = '/volume1/webapp/.env'
+        with open(env_path, 'r') as f:
+            env = f.read()
+        env = re.sub(r'BOX_ACCESS_TOKEN=.*', f'BOX_ACCESS_TOKEN={access_token}', env)
+        env = re.sub(r'BOX_REFRESH_TOKEN=.*', f'BOX_REFRESH_TOKEN={refresh_token}', env)
+        with open(env_path, 'w') as f:
+            f.write(env)
     except Exception:
         pass
 
@@ -48,6 +60,19 @@ def _get_box_client():
         store_tokens=_store_tokens,
     )
     return Client(auth)
+
+
+def _box_token_keeper():
+    import time
+    # 48時間ごとにBOXへアクセスしてリフレッシュトークンの60日期限をリセット
+    while True:
+        time.sleep(48 * 3600)
+        try:
+            _get_box_client().user().get()
+        except Exception:
+            pass
+
+threading.Thread(target=_box_token_keeper, daemon=True).start()
 
 
 def _list_excel_files(folder_id):
@@ -708,6 +733,49 @@ def fax_save():
         return render_template('fax.html', error=f'保存エラー: {e}', order_files=order_files)
     finally:
         _cleanup(tmp, output_tmp)
+
+
+# ── 発注書変換 ──────────────────────────────────────────────────
+
+@app.route('/hacchu', methods=['GET', 'POST'])
+@login_required
+def hacchu():
+    if request.method == 'GET':
+        return render_template('hacchu.html', error=None, version=VERSION)
+
+    files = request.files.getlist('order_files')
+    if not files or all(f.filename == '' for f in files):
+        return render_template('hacchu.html', error='ファイルを選択してください', version=VERSION)
+
+    tmp_paths = []
+    try:
+        for f in files:
+            if not f.filename:
+                continue
+            fd, tmp = tempfile.mkstemp(suffix='.xlsx')
+            os.close(fd)
+            f.save(tmp)
+            tmp_paths.append(tmp)
+
+        if not tmp_paths:
+            return render_template('hacchu.html', error='有効なファイルがありません', version=VERSION)
+
+        from datetime import date
+        mmdd = f"{date.today().month:02d}{date.today().day:02d}"
+        output_filename = f"_稲穂_{mmdd}_発注書.xlsx"
+
+        file_bytes = core_hacchu.web_merge_orders(tmp_paths)
+        from flask import send_file
+        return send_file(
+            io.BytesIO(file_bytes),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=output_filename,
+        )
+    except Exception as e:
+        return render_template('hacchu.html', error=f'変換エラー: {e}', version=VERSION)
+    finally:
+        _cleanup(*tmp_paths)
 
 
 if __name__ == '__main__':

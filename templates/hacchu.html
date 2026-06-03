@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>発注書変換 — 稲穂事務ツールWEB版</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; }
+.header { background: #1a2332; color: #fff; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 18px; }
+.logout { color: #94a3b8; font-size: 13px; text-decoration: none; }
+.content { padding: 32px 20px; max-width: 480px; margin: 0 auto; }
+.page-title { font-size: 22px; font-weight: 700; color: #1a2332; margin-bottom: 6px; }
+.sub { color: #7a8ca0; font-size: 14px; margin-bottom: 28px; }
+.card { background: #fff; border-radius: 14px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.card-label { font-size: 13px; color: #7a8ca0; margin-bottom: 12px; font-weight: 600; }
+.note { font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.6; }
+.file-input-wrap { border: 2px dashed #c8d6e0; border-radius: 10px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+.file-input-wrap:hover { border-color: #8b5cf6; }
+.file-input-wrap input[type=file] { display: none; }
+.file-input-wrap .icon { font-size: 36px; margin-bottom: 8px; }
+.file-input-wrap .hint { font-size: 14px; color: #4a5568; }
+.file-input-wrap .hint-sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+.file-list { margin-top: 12px; }
+.file-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; color: #2d3748; border-bottom: 1px solid #f0f4f8; }
+.file-item:last-child { border-bottom: none; }
+.file-item .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-convert { display: block; width: 100%; padding: 18px 20px; border-radius: 14px; border: none; font-size: 17px; font-weight: 700; cursor: pointer; background: #8b5cf6; color: #fff; margin-bottom: 16px; }
+.btn-convert:active { opacity: 0.85; }
+.btn-convert:disabled { background: #c4b5fd; cursor: not-allowed; }
+.btn-back { display: block; text-align: center; color: #7a8ca0; font-size: 14px; text-decoration: none; padding: 8px; }
+.error { background: #fff5f5; border: 1px solid #fed7d7; border-radius: 10px; padding: 14px 16px; color: #c53030; font-size: 14px; margin-bottom: 20px; }
+.loading { display: none; text-align: center; padding: 20px; color: #7a8ca0; font-size: 14px; }
+.version { position: fixed; bottom: 12px; right: 12px; font-size: 11px; color: #94a3b8; background: rgba(26, 35, 50, 0.8); padding: 4px 8px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🌾 稲穂事務ツールWEB版</h1>
+  <a href="/logout" class="logout">ログアウト</a>
+</div>
+<div class="content">
+  <p class="page-title">🔄 発注書変換</p>
+  <p class="sub">複数の発注書Excelをアップロードして1つに結合します</p>
+
+  {% if error %}
+  <div class="error">⚠️ {{ error }}</div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" id="form">
+    <div class="card">
+      <p class="card-label">📂 発注書ファイル（複数選択可）</p>
+      <label class="file-input-wrap" id="drop-area">
+        <input type="file" name="order_files" id="file-input" multiple accept=".xlsx,.xls">
+        <div class="icon">📁</div>
+        <div class="hint">タップしてファイルを選択</div>
+        <div class="hint-sub">複数ファイル選択OK（.xlsx）</div>
+      </label>
+      <div class="file-list" id="file-list"></div>
+      <p class="note">
+        ・コピーシートがあるファイルはコピーシートを使用します<br>
+        ・稲穂シートと三共シートを自動で分類します<br>
+        ・3店舗ごとに1シートにまとめます
+      </p>
+    </div>
+
+    <button type="submit" class="btn-convert" id="btn-submit">⚡ 変換してダウンロード</button>
+    <div class="loading" id="loading">⏳ 変換中… しばらくお待ちください</div>
+  </form>
+
+  <a href="/" class="btn-back">← トップへ戻る</a>
+</div>
+<div class="version">v{{ version }}</div>
+
+<script>
+const input = document.getElementById('file-input');
+const fileList = document.getElementById('file-list');
+const form = document.getElementById('form');
+const btn = document.getElementById('btn-submit');
+const loading = document.getElementById('loading');
+
+input.addEventListener('change', () => {
+  fileList.innerHTML = '';
+  Array.from(input.files).forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.innerHTML = `<span>📄</span><span class="fname">${f.name}</span>`;
+    fileList.appendChild(div);
+  });
+});
+
+form.addEventListener('submit', () => {
+  btn.disabled = true;
+  btn.textContent = '変換中…';
+  loading.style.display = 'block';
+});
+</script>
+</body>
+</html>

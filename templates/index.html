@@ -16,6 +16,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
 .btn-normal { background: #3b82f6; color: #fff; }
 .btn-manual { background: #10b981; color: #fff; }
 .btn-fax { background: #f59e0b; color: #fff; }
+.btn-hacchu { background: #8b5cf6; color: #fff; }
 .btn:active { opacity: 0.85; }
 .btn .icon { font-size: 28px; display: block; margin-bottom: 6px; }
 .btn .desc { font-size: 13px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
@@ -43,6 +44,11 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0
     <span class="icon">📠</span>
     倉庫FAX確認
     <div class="desc">FAX発注書の数量確認・保存 → 通常モードへ</div>
+  </a>
+  <a href="/hacchu" class="btn btn-hacchu">
+    <span class="icon">🔄</span>
+    発注書変換
+    <div class="desc">複数の発注書Excelを1つに結合してダウンロード</div>
   </a>
 </div>
 <div class="version">v{{ version }}</div>
