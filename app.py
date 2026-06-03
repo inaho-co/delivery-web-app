@@ -793,7 +793,7 @@ def hacchu():
 
         from datetime import date
         mmdd = f"{date.today().month:02d}{date.today().day:02d}"
-        output_filename = f"_稲穂_{mmdd}_発注書.xlsx"
+        output_filename = f"稲穂_{mmdd}_発注書.xlsx"
 
         file_bytes = core_hacchu.web_merge_orders(tmp_paths)
         _upload_or_update_box_file(folder_id, output_filename, file_bytes)
